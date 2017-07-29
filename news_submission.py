@@ -146,6 +146,51 @@ class news_submission(dict):
 			outputs.append(submit_dict)
 		return outputs
 	
+	def consolidateData(self):
+		"""
+		将各个测试集的具有uuid的json汇入
+
+		"""
+		reports=[]
+		annos=[]
+		prices=[]
+		
+		with codecs.open('AnnouncementsTrainSample.json', 'r', 'utf-8') as file1:
+			dict_str = file1.readlines()
+			jdict = json.loads(dict_str[0],encoding='utf-8')
+			annos = jdict
+		with codecs.open('ResearchTrainSample.json', 'r', 'utf-8') as file1:
+			dict_str = file1.readlines()
+			jdict = json.loads(dict_str[0],encoding='utf-8')
+			reports = jdict
+		with codecs.open('pricedetail.json', 'r', 'utf-8') as file1:
+			dict_str = file1.readlines()
+			jdict = json.loads(dict_str[0],encoding='utf-8')
+			prices = jdict
+	
+	
+		for i in range(len(prices)):
+			p=prices[i]
+			item=predict_point()
+			item.uuid=p['uuid']
+			item.d0_wd = p['d0_wd']
+			item.d1_wd = p['d1_wd']
+			item.d2_wd = p['d2_wd']
+			item.d3_wd = p['d3_wd']
+			for k in range(len(reports)):
+				if reports[k]['uuid']==item.uuid:
+					r = ResearchTrainSample(reports[k])
+					item.researchlist.append(r)
+			for m in range(len(annos)):
+				if annos[m]['uuid'] == item.uuid:
+					a = AnnouncementsTrainSample(annos[m])
+					item.announcelist.append(a)
+
+			self.add_item(item)
+		
+	
+	
+	
 class predict_point(object):
 	def __init__(self,_uuid=None,value1=None,value2=None,value3=None):
 		"""
@@ -241,12 +286,13 @@ class AnnouncementsTrainSample(object):
 	"""
 	def __init__(self, jsondict):
 		if isinstance(jsondict, dict):
-			self.news_id=jsondict['news_id']
-			self.annonce_type=jsondict['annonce_type']
-			self.publish_date=jsondict['publish_date']
-			self.notice_date=jsondict['notice_date']
-			if 'content' in jsondict:
-				self.content=jsondict['content']
+			if 'news_id' in jsondict:
+				self.news_id=jsondict['news_id']
+				self.annonce_type=jsondict['annonce_type']
+				self.publish_date=jsondict['publish_date']
+				self.notice_date=jsondict['notice_date']
+				if 'content' in jsondict:
+					self.content=jsondict['content']
 			
 		
 class ResearchRelations(object):

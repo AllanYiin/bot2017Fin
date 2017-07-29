@@ -24,8 +24,9 @@ import csv
 
 from news_submission import *
 
+files=['pricedetail.json','AnnouncementsTrainSample.json','ResearchTrainSample.json']
 
-files=['pricedetail.json','AnnouncementsRelations.json','AnnouncementsTrainSample.json','ResearchRelation.json','ResearchTrainSample.json']
+#files=['pricedetail.json','AnnouncementsRelations.json','AnnouncementsTrainSample.json','ResearchRelation.json','ResearchTrainSample.json']
 data={}
 def handel_utf8bom():
 	"""
@@ -129,21 +130,36 @@ def save_dict_json(dict, dict_file_name):
 	file.write(dict_str)  # 写入
 	file.close()
 	
-
+def porocessTestData():
+	"""
+	用于处理测试集数据
+	
+	"""
+	subm=news_submission()
+	subm.consolidateData()
+	with open('submit_dataset.pkl', 'wb') as handle:
+		pickle.dump(subm, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
-	print('preload json start!')
+	porocessTestData()
+	
+	with open('submit_dataset.pkl', 'rb') as handle:
+		news = pickle.load(handle)
+	
+	
+	
+	#print('preload json start!')
 	#handel_utf8bom()  #如果是linux平台请自行解除注解执行一次即可
-	preload_data()
-	news=[]
-	try:
-		with open('testingset.pkl', 'rb') as handle:
-			news = pickle.load(handle)
-	except IOError as e:
-			news = gen_base()
-	gen_submit('json', news)
-	gen_submit('pickle', news)
-	gen_submit('txt', news)
+	# preload_data()
+	# news=[]
+	# try:
+	# 	with open('testingset.pkl', 'rb') as handle:
+	# 		news = pickle.load(handle)
+	# except IOError as e:
+	# 		news = gen_base()
+	# gen_submit('json', news)
+	# gen_submit('pickle', news)
+	# gen_submit('txt', news)
 	
 	#
 	
