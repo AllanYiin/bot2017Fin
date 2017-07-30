@@ -288,11 +288,24 @@ class AnnouncementsTrainSample(object):
 		if isinstance(jsondict, dict):
 			if 'news_id' in jsondict:
 				self.news_id=jsondict['news_id']
-				self.annonce_type=jsondict['annonce_type']
-				self.publish_date=jsondict['publish_date']
-				self.notice_date=jsondict['notice_date']
+				if 'annonce_type' in jsondict:
+					self.annonce_type=jsondict['annonce_type']
+				else:
+					self.annonce_type = jsondict['AnnonceType']
+				if 'annonce_type' in jsondict:
+					self.annonce_title=jsondict['annonce_title']
+				else:
+					self.annonce_title = jsondict['AnnonceTitle']
+				
+				if 'publish_date' in jsondict:
+					self.publish_date=jsondict['publish_date']
+				if 'notice_date' in jsondict:
+					self.notice_date=jsondict['notice_date']
 				if 'content' in jsondict:
 					self.content=jsondict['content']
+				else:
+					self.annonce_type = jsondict['Content']
+				
 			
 		
 class ResearchRelations(object):
