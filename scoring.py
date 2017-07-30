@@ -1,5 +1,7 @@
 import numpy as np
 import pickle
+import re
+import  pandas
 from itertools import groupby
 from operator import itemgetter
 from news_submission import *
@@ -74,7 +76,20 @@ def validate_submit(file_path,news_submit=None):
 			
 			elif os.path.splitext(os.path.basename(file_path))[1].lower() == ".txt":
 				with codecs.open(file_path, 'r', 'utf-8') as file1:
-					submit = {k: map(str.strip, g) for k, g in groupby(file1, key=itemgetter(0))}
+					sep = '\t'
+					submit=[]
+					lines=file1.readlines()
+					keys=lines[0].replace('\r','').replace('\n','').split(sep)
+					for i in range(1,len(lines)-1):
+						dictitem={}
+						values=lines[i].replace('\r','').replace('\n','').split(sep)
+						for m in range(len(keys)):
+							if len(values[0])>0:
+								if re.match("^[+-]?\d(>?\.\d+)?$", values[m]) :
+									dictitem[keys[m]]=float(values[m])
+								else:
+									dictitem[keys[m]] =values[m]
+								submit.append(dictitem)
 			else:
 				return False
 			
@@ -131,7 +146,7 @@ def validate_submit(file_path,news_submit=None):
 
 if __name__ == '__main__':
 	
-	result=validate_submit('submit_dataset.json')
+	result=validate_submit('submit_dataset.txt')
 	predictions_list=[]
 	answer_list=[]
 	
