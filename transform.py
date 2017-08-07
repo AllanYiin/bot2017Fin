@@ -53,7 +53,6 @@ def preload_data():
 			print(file+'  loaded...!')
 			
 			
-
 class CJsonEncoder(json.JSONEncoder):
 	def default(self, obj):
 		if isinstance(obj, datetime.datetime):
@@ -121,6 +120,10 @@ def gen_submit(submit_type,newssub):
 	except Exception as err:
 		print(err)
 
+
+
+
+
 def save_dict_json(dict, dict_file_name):
 	"""将dict进行json序列化,并以json形式保存
     :param dict: 字典结构数据
@@ -137,8 +140,27 @@ def porocessTestData():
 	"""
 	subm=news_submission()
 	subm.consolidateData()
+	#
 	with open('submit_dataset.pkl', 'wb') as handle:
 		pickle.dump(subm, handle, protocol=pickle.HIGHEST_PROTOCOL)
+		
+		
+		
+		
+def listofdict2txt(listofdict,save_path):
+	text = ''
+	for m in range(len(listofdict)):
+		item = listofdict[m]
+		if isinstance(item, dict):
+			values=[str(v) for  k,v in item.items()]
+			text +='\t'.join(values) + '\r\n'
+	file = codecs.open(save_path, 'w', encoding="utf-8")
+	file.write(text)
+def json2txt(json_file,save_path):
+	with codecs.open(json_file, 'r', 'utf-8') as file1:
+		dict_str = file1.readlines()
+		jsondict = json.loads(dict_str[0], encoding='utf-8')
+		return listofdict2txt(jsondict,save_path)
 
 if __name__ == '__main__':
 	porocessTestData()

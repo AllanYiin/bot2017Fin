@@ -5,27 +5,29 @@ import random
 import uuid
 import datetime
 import time
+import warnings
 import weakref
 import shutil
 import numpy as np
 
-class news_submission(dict):
-	def __init__(self, ):
+class news_submission(list):
+	def __init__(self):
 		"""
 		测试集数据结构
 		"""
+		super().__init__()
 		self.name='testingset'
 		self.is_masked=False
 
 	def size(self):
-		return len(self.keys())
+		return len(self)
 	def add_item(self,obj):
 		"""
 		:param  新增对象obj至dict结构:
 		:return:无回传值
 		"""
-		if isinstance(obj, predict_point):
-			self[str(obj.uuid)]=obj
+		if isinstance(obj, pricedetail):
+			self.append(obj)
 	def load_items(self, data):
 		"""
 		批量将pricedetail加入
@@ -39,7 +41,7 @@ class news_submission(dict):
 				try:
 					if isinstance(data[i], dict):
 						item = pricedetail(data[i])
-						self.add_item(item.to_predicpoint())
+						self.add_item(item)
 				except OSError as e:
 					print(e)
 				if i % 1000 == 0 and i > 0:
@@ -134,16 +136,10 @@ class news_submission(dict):
 		内部生成提交数据结构
 		:return :包含dict的清单
 		"""
-		dataset=list(self.values())
 		outputs=[]
-		for i in range(len(self.values())):
-			item=dataset[i]
-			submit_dict={}
-			submit_dict['uuid']=item.uuid
-			submit_dict['value1'] = item.value1
-			submit_dict['value2'] = item.value2
-			submit_dict['value3'] =  item.value3
-			outputs.append(submit_dict)
+		for i in range(len(self)):
+			if isinstance(self[i],pricedetail):
+				outputs.append(self[i].to_submit_dict())
 		return outputs
 	
 	def consolidateData(self):
@@ -154,7 +150,7 @@ class news_submission(dict):
 		reports=[]
 		annos=[]
 		prices=[]
-		
+		news=[]
 		with codecs.open('AnnouncementsTrainSample.json', 'r', 'utf-8') as file1:
 			dict_str = file1.readlines()
 			jdict = json.loads(dict_str[0],encoding='utf-8')
@@ -163,6 +159,12 @@ class news_submission(dict):
 			dict_str = file1.readlines()
 			jdict = json.loads(dict_str[0],encoding='utf-8')
 			reports = jdict
+			
+		with codecs.open('NewsTrainSample.json', 'r', 'utf-8') as file1:
+			dict_str = file1.readlines()
+			jdict = json.loads(dict_str[0],encoding='utf-8')
+			news = jdict
+			
 		with codecs.open('pricedetail.json', 'r', 'utf-8') as file1:
 			dict_str = file1.readlines()
 			jdict = json.loads(dict_str[0],encoding='utf-8')
@@ -170,13 +172,7 @@ class news_submission(dict):
 	
 	
 		for i in range(len(prices)):
-			p=prices[i]
-			item=predict_point()
-			item.uuid=p['uuid']
-			item.d0_wd = p['d0_wd']
-			item.d1_wd = p['d1_wd']
-			item.d2_wd = p['d2_wd']
-			item.d3_wd = p['d3_wd']
+			item=prices[i]
 			for k in range(len(reports)):
 				if reports[k]['uuid']==item.uuid:
 					r = ResearchTrainSample(reports[k])
@@ -185,6 +181,10 @@ class news_submission(dict):
 				if annos[m]['uuid'] == item.uuid:
 					a = AnnouncementsTrainSample(annos[m])
 					item.announcelist.append(a)
+			for n in range(len(news)):
+				if news[n]['uuid'] == item.uuid:
+					nn = NewsTrainSample(news[n])
+					item.newslist.append(nn)
 
 			self.add_item(item)
 		
@@ -192,6 +192,7 @@ class news_submission(dict):
 	
 	
 class predict_point(object):
+	warnings.warn("Predict_point相关内容即将弃用，建议使用较单纯的list of dict替代", DeprecationWarning, stacklevel=2)
 	def __init__(self,_uuid=None,value1=None,value2=None,value3=None):
 		"""
 		测试集的基础单位，所有的新闻都会放在这个类中
@@ -235,6 +236,7 @@ class pricedetail(object):
 	def __init__(self, jsondict=None):
 		if isinstance(jsondict, dict):
 			if jsondict is not None:
+				self.tag = jsondict['tag']
 				self.security_id =jsondict['security_id']
 				self.data_date=time.strptime(jsondict['data_date'],"%Y-%m-%d")
 				self.d0_wd =jsondict['d0_wd']
@@ -245,8 +247,22 @@ class pricedetail(object):
 				self.d2_open = jsondict['d2_open']
 				self.d3_wd = jsondict['d3_wd']
 				self.d3_open = jsondict['d3_open']
-			self.uuid=str(uuid.uuid4())
+
+				self.uuid=None
+				self.announcelist = []
+				self.researchlist = []
+				self.newslist = []
+				
+	def mask_data(self):
+		"""
+		抹去证券编号与日期信息(测试集不提供此类信息)
+		"""
+		self.security_id=None
+		self.data_date=None
+	
+				
 	def to_predicpoint(self,v1=None,v2=None,v3=None):
+		warnings.warn("Predict_point相关内容即将弃用，建议使用较单纯的list of dict替代", DeprecationWarning,stacklevel=2)
 		item = predict_point()
 		item.uuid = self.uuid
 		item.security_id = self.security_id
@@ -268,6 +284,27 @@ class pricedetail(object):
 		else:
 			item.value3=v3
 		return item
+	
+	def to_submit_dict(self, uuid=None):
+		"""
+		在一般情况下是不需要自行指定数值，应该都是根据数据计算得出来的。仅在内部测试阶段会自行指定值
+		:param uuid:
+		:return:
+		"""
+		item = {}
+		if uuid:
+			item['uuid'] = uuid
+		elif len(self.uuid)==36:
+			item['uuid'] = self.uuid
+		#测试集数据会自带uuid，训练集则可以自行设定，以供自行测试使用
+		# item['security_id'] = self.security_id
+		# item['data_date'] = self.data_date
+		item['value1'] = (float(self.d1_open) / float(self.d0_open)) - 1
+		item['value2'] = (float(self.d2_open) / float(self.d1_open)) - 1
+		item['value3'] =  (float(self.d3_open) / float(self.d2_open)) - 1
+		return item
+
+
 class AnnouncementsRelations(object):
 	"""
 	初赛数据集AnnouncementsRelations
@@ -288,24 +325,28 @@ class AnnouncementsTrainSample(object):
 		if isinstance(jsondict, dict):
 			if 'news_id' in jsondict:
 				self.news_id=jsondict['news_id']
-				if 'annonce_type' in jsondict:
-					self.annonce_type=jsondict['annonce_type']
-				else:
-					self.annonce_type = jsondict['AnnonceType']
-				if 'annonce_type' in jsondict:
-					self.annonce_title=jsondict['annonce_title']
-				else:
-					self.annonce_title = jsondict['AnnonceTitle']
+			elif 'AnnonceCode' in jsondict:
+				self.news_id = jsondict['AnnonceCode']
+			if 'annonce_type' in jsondict:
+				self.annonce_type=jsondict['annonce_type']
+			elif 'AnnonceType' in jsondict:
+				self.annonce_type = jsondict['AnnonceType']
+					
+			if 'annonce_title' in jsondict:
+				self.annonce_title=jsondict['annonce_title']
+			elif 'AnnonceTitle' in jsondict:
+				self.annonce_title = jsondict['AnnonceTitle']
 				
-				if 'publish_date' in jsondict:
-					self.publish_date=jsondict['publish_date']
-				if 'notice_date' in jsondict:
-					self.notice_date=jsondict['notice_date']
-				if 'content' in jsondict:
-					self.content=jsondict['content']
-				else:
-					self.annonce_type = jsondict['Content']
-				
+			#在新闻内容档案中将不会再有日期类字段(请查询关联檔)
+			# if 'publish_date' in jsondict:
+			# 	self.publish_date=jsondict['publish_date']
+			# if 'notice_date' in jsondict:
+			# 	self.notice_date=jsondict['notice_date']
+			if 'content' in jsondict:
+				self.content=jsondict['content']
+			elif 'Content' in jsondict:
+				self.content = jsondict['Content']
+			self.uuid = None
 			
 		
 class ResearchRelations(object):
@@ -315,12 +356,12 @@ class ResearchRelations(object):
 	def __init__(self, jsondict):
 		if isinstance(jsondict, dict):
 			self.news_id = jsondict['news_id']
-			self.title= jsondict['title']
+			#self.title= jsondict['title'] #关联檔将不再放置新闻内容之信息
 			if 'security_id' in jsondict:
 				self.security_id = jsondict['security_id']
 			else:
 				self.security_id = jsondict['security_code']  #bug fix
-			self.show_time = jsondict['show_time'].replace('T00:00:00','')
+			self.publish_date = jsondict['show_time'].replace('T00:00:00','')
 			self.uuid=None
 	
 
@@ -334,5 +375,33 @@ class ResearchTrainSample(object):
 			self.title = jsondict['title']
 			self.column_type = jsondict['column_type']
 			if 'content' in jsondict:
-				self.content = jsondict['content']
-			
+				self.content=jsondict['content']
+			elif 'Content' in jsondict:
+				self.content = jsondict['Content']
+			self.uuid = None
+
+
+class NewsRelations(object):
+	"""
+	初赛数据集NewsRelations(追加之新闻信息)
+	"""
+	def __init__(self, jsondict):
+		if isinstance(jsondict, dict):
+			self.news_id=jsondict['news_id']
+			self.security_id=jsondict['security_id']
+			self.publish_date=jsondict['publish_date']
+			self.uuid = None
+
+class NewsTrainSample(object):
+	"""
+	初赛数据集NewsTrainSample(追加之新闻信息)
+	"""
+	def __init__(self, jsondict):
+		if isinstance(jsondict, dict):
+			self.news_id = jsondict['news_id']
+			self.title = jsondict['title']
+			if 'content' in jsondict:
+				self.content=jsondict['content']
+			elif 'Content' in jsondict:
+				self.annonce_type = jsondict['Content']
+			self.uuid = None

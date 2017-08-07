@@ -1,22 +1,48 @@
 import numpy as np
 import pickle
 import re
+import warnings
+import numbers
+import string
 import  pandas
 from itertools import groupby
 from operator import itemgetter
 from news_submission import *
 
 
-def rmse(predictions,answer):
+
+def rmse(predictions:np.ndarray,answer:np.ndarray):
 	"""
 	評分程序
 	:param predictions:
 	:param answer:
 	:return:
 	"""
-	if isinstance(predictions, np.ndarray):
-		return np.sum(np.sqrt(np.mean((predictions-answer)**2)))
-	
+	warnings.warn("此计分方法已弃用", DeprecationWarning, stacklevel=2)
+	return np.sum(np.sqrt(np.mean(np.square(np.subtract(answer, predictions)),0)))
+
+def expect_margin(predictions:np.ndarray,answer:np.ndarray):
+	predict_sign=np.sign(predictions)
+	answer_sign = np.sign(answer)
+
+	margin_array=[]
+	for m in range(answer.shape[0]):
+		row=[]
+		for n in range(answer.shape[1]):
+			a=answer[m,n]
+			p = predictions[m,n]
+			p_s=predict_sign[m,n]
+			a_s=answer_sign[m,n]
+			if p_s==a_s :
+				row.append(min(abs(a),abs(p)))
+			elif p_s!=a_s and a*p!=0:
+				row.append(-1*(abs(a)+abs(p)))
+			else:
+				row.append(-1*abs(a))
+		margin_array.append(row)
+	margin_array=np.array(margin_array)
+	return np.sum(margin_array,0)
+
 	
 def generate_scoring_array(predictions_list,answer_list):
 	"""
@@ -28,31 +54,57 @@ def generate_scoring_array(predictions_list,answer_list):
 	preddict={}
 	answer=[]
 	pred=[]
+	missing=0
 	if isinstance(predictions_list, list):
 		for i in range(len(predictions_list)):
-			preddict[predictions_list[i].uuid]=predictions_list[i]
-			
+			if isinstance(predictions_list[i],dict):
+				preddict[predictions_list[i]['uuid']]=predictions_list[i]
+			elif isinstance(predictions_list[i],predict_point):
+				preddict[predictions_list[i].uuid] = predictions_list[i]
 	if isinstance(answer_list,list):
 		for i in range(len(answer_list)):
 			item=answer_list[i]
-			_item=preddict[item.uuid]
-			if isinstance(answer_list[i],predict_point):
-				answer.append(np.asarray([item.value1,item.value2,item.value3]))
-				pred.append(np.asarray([_item.value1,_item.value2,_item.value3]))
-	return 	np.asarray(pred),np.asarray(answer)
+			temp_uuid=None
+			if isinstance(item,dict):
+				answer.append(np.asarray([item['value1'], item['value2'], item['value3']]))
+				if item['uuid'] in preddict:
+					temp_uuid=item['uuid']
+			elif isinstance(item, predict_point):
+				answer.append(np.asarray([item.value1, item.value2, item.value3]))
+				if item.uuid in preddict:
+					temp_uuid=item.uuid
+			if temp_uuid is not None:
+				if isinstance(preddict[temp_uuid], dict):
+					pred.append(np.asarray([preddict[temp_uuid]['value1'], preddict[temp_uuid]['value2'],
+					                        preddict[temp_uuid]['value3']]))
+				elif isinstance(preddict[temp_uuid], predict_point):
+					pred.append(np.asarray([preddict[temp_uuid].value1, preddict[temp_uuid].value2,
+					                        preddict[temp_uuid].value3]))
+			else:
+				pred.append(np.asarray([0.1,0.1,0.1]))
+				missing += 1
+	return 	np.array(pred),np.array(answer),missing
 
 
 def scoring(predictions_list,answer_list):
 	"""
 	評分流程作業
+	为了彻底解决原有计分模式可以透过全部写零或是基于零的随机数来获取高分之不公平状况。因此重新修正评分机制，改以预期收益率作为计分基础
+		(1)	以选手答案作为交易决策基准，若是选手预测涨，则买入，选手预测跌，则放空，假设所有股票面额一样，计分时不考虑个别股票支票价值差异(因为选手在评测阶段不会知道对应之股票编号)
+		(2)	如果选手预测涨跌幅(涨、不变、跌)与实际一致，则会产生获利，获利金额应该等于选手预测涨跌幅绝对值与实际涨跌幅绝对值取其小者。
+		(3)	如果选手预测涨跌幅(涨、不变、跌)与实际不一致，则会产生损失，损失金额应该等于选手预测涨跌幅绝对值与实际涨跌幅绝对值加总。
+		(4)	如果选手预测不变(涨跌幅为零)，除非答案也是不变，不然将会遭受未执行交易策略的期望收益损失或跌价风险。金额会等于实际涨跌幅绝对值
+		(5)	将[涨跌幅一致收益(2)	]-[涨跌幅不一致损失(3)]-[预测不变损失(4)]即可得到该预测的收益
+		(6)	计算三日个别之收益加总，除以完美预测状况下之最佳收益，即可获得预期收益率
 	:param predictions_list:
 	:param answer_list:
 	:return:
 	"""
-	pred,answer=generate_scoring_array(predictions_list,answer_list)
+	pred,answer,missing=generate_scoring_array(predictions_list,answer_list)
 	print(pred)
 	print(answer)
-	return rmse(pred,answer)
+	score=expect_margin(pred,answer)
+	return score ,missing
 
 
 def validate_submit(file_path,news_submit=None):
@@ -89,7 +141,7 @@ def validate_submit(file_path,news_submit=None):
 									dictitem[keys[m]]=float(values[m])
 								else:
 									dictitem[keys[m]] =values[m]
-								submit.append(dictitem)
+						submit.append(dictitem)
 			else:
 				return False
 			
@@ -143,6 +195,45 @@ def validate_submit(file_path,news_submit=None):
 		
 	else:
 		return False
+
+
+def submitfile2listofdict(file_path):
+	''''
+		将各种提交格式加载
+	'''
+	if os.path.exists(file_path):
+		try:
+			submit = []
+			if os.path.splitext(os.path.basename(file_path))[1].lower() == ".json":
+				with codecs.open(file_path, 'r', 'utf-8') as file1:
+					dict_str = file1.readlines()
+					submit = json.loads(dict_str[0], encoding='utf-8')
+					return submit
+			elif os.path.splitext(os.path.basename(file_path))[1].lower() == ".pkl":
+				with open(file_path, 'rb') as handle:
+					submit = pickle.load(handle)
+					return submit
+			elif os.path.splitext(os.path.basename(file_path))[1].lower() in [".txt", ".csv", ".dat"]:
+				with codecs.open(file_path, 'r', 'utf-8') as file1:
+					sep = '\t' if os.path.splitext(os.path.basename(file_path))[1].lower() != ".csv" else ','
+					submit = []
+					lines = file1.readlines()
+					keys = lines[0].replace('\r', '').replace('\n', '').split(sep)
+					for i in range(1, len(lines) - 1):
+						dictitem = {}
+						values = lines[i].replace('\r', '').replace('\n', '').split(sep)
+						for m in range(len(keys)):
+							if len(values[0]) > 0:
+								if re.match("^[+-]?\d(>?\.\d+)?$", values[m].strip()):
+									dictitem[keys[m]] = float(values[m].strip())
+								else:
+									dictitem[keys[m]] = values[m].strip()
+						submit.append(dictitem)
+					return submit
+		except OSError as e:
+			return None
+	return None
+
 
 if __name__ == '__main__':
 	
