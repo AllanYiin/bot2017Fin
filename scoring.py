@@ -86,6 +86,7 @@ def generate_scoring_array(predictions_list,answer_list):
 	return 	np.array(pred),np.array(answer),missing
 
 
+
 def scoring(predictions_list,answer_list):
 	"""
 	評分流程作業
@@ -103,8 +104,12 @@ def scoring(predictions_list,answer_list):
 	pred,answer,missing=generate_scoring_array(predictions_list,answer_list)
 	print(pred)
 	print(answer)
-	score=expect_margin(pred,answer)
+	margin1=expect_margin(pred,answer) #选手预测的三日预期收益
+	margin2= expect_margin(answer, answer) #完美预测的三日预期收益
+	margin_rate=np.divide(margin1,margin2)
+	score=np.sum(margin_rate)
 	return score ,missing
+
 
 
 def validate_submit(file_path,news_submit=None):
