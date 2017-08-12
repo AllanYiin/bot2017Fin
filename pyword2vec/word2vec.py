@@ -198,16 +198,4 @@ if __name__ == '__main__':
 	
 	
 	
-	# files=['W2v_1151245.json','W2v_199999.json','W2v_399999.json','W2v_599999.json','W2v_799999.json','W2v_999999.json']
-	# for file in  files:
-	# 	f= codecs.open(file,'r','utf-8')
-	# 	jdict=json.load(f)
-	# 	f.close()
-	# 	print(file + '  loaded...!')
-	# 	if isinstance(jdict,dict):
-	# 		for k,v in jdict.items():
-	# 			word_embed[k]=np.array(v)
 	
-	# fil=open('word2vec.pkl', 'rb')
-	# word_embed=cPickle.load(fil)
-	# fil.close()
