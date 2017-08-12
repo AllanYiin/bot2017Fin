@@ -35,10 +35,11 @@ def expect_margin(predictions:np.ndarray,answer:np.ndarray):
 			a_s=answer_sign[m,n]
 			if p_s==a_s :
 				row.append(min(abs(a),abs(p)))
-			elif p_s!=a_s and a*p!=0:
-				row.append(-1*(abs(a)+abs(p)))
+			# elif p_s!=a_s or p==0:
+			# 	row.append(-1*(abs(a)+abs(p)))
 			else:
-				row.append(-1*abs(a))
+				#row.append(-1*abs(a))
+				row.append(-1 * (abs(a) + abs(p)))
 		margin_array.append(row)
 	margin_array=np.array(margin_array)
 	return np.sum(margin_array,0)
