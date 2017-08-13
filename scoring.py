@@ -138,7 +138,7 @@ def validate_submit(file_path,news_submit=None):
 					submit=[]
 					lines=file1.readlines()
 					keys=lines[0].replace('\r','').replace('\n','').split(sep)
-					for i in range(1,len(lines)-1):
+					for i in range(1,len(lines)):
 						dictitem={}
 						values=lines[i].replace('\r','').replace('\n','').split(sep)
 						for m in range(len(keys)):
@@ -225,7 +225,7 @@ def submitfile2listofdict(file_path):
 					submit = []
 					lines = file1.readlines()
 					keys = lines[0].replace('\r', '').replace('\n', '').split(sep)
-					for i in range(1, len(lines) - 1):
+					for i in range(1, len(lines)):
 						dictitem = {}
 						values = lines[i].replace('\r', '').replace('\n', '').split(sep)
 						for m in range(len(keys)):
