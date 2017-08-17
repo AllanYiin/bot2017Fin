@@ -44,7 +44,12 @@ def expect_margin(predictions:np.ndarray,answer:np.ndarray):
 	margin_array=np.array(margin_array)
 	return np.sum(margin_array,0)
 
-	
+def price_trend_hit(predictions:np.ndarray,answer:np.ndarray):
+	predict_sign=np.sign(predictions)
+	answer_sign = np.sign(answer)
+	hit=np.equal(answer_sign,predict_sign)
+	return np.mean(hit,0)
+
 def generate_scoring_array(predictions_list,answer_list):
 	"""
 	
@@ -58,7 +63,7 @@ def generate_scoring_array(predictions_list,answer_list):
 	missing=0
 	if isinstance(predictions_list, list):
 		for i in range(len(predictions_list)):
-			if isinstance(predictions_list[i],dict):
+			if isinstance(predictions_list[i],dict) and 'uuid' in predictions_list[i]:
 				preddict[predictions_list[i]['uuid']]=predictions_list[i]
 			elif isinstance(predictions_list[i],predict_point):
 				preddict[predictions_list[i].uuid] = predictions_list[i]
@@ -66,23 +71,23 @@ def generate_scoring_array(predictions_list,answer_list):
 		for i in range(len(answer_list)):
 			item=answer_list[i]
 			temp_uuid=None
-			if isinstance(item,dict):
-				answer.append(np.asarray([item['value1'], item['value2'], item['value3']]))
+			if isinstance(item,dict) and 'uuid' in item:
+				answer.append(np.asarray([float(item['value1']), float(item['value2']), float(item['value3'])],dtype=np.float64))
 				if item['uuid'] in preddict:
 					temp_uuid=item['uuid']
 			elif isinstance(item, predict_point):
-				answer.append(np.asarray([item.value1, item.value2, item.value3]))
+				answer.append(np.asarray([float(item.value1), float(item.value2), float(item.value3)],dtype=np.float64))
 				if item.uuid in preddict:
 					temp_uuid=item.uuid
 			if temp_uuid is not None:
-				if isinstance(preddict[temp_uuid], dict):
-					pred.append(np.asarray([preddict[temp_uuid]['value1'], preddict[temp_uuid]['value2'],
-					                        preddict[temp_uuid]['value3']]))
+				if isinstance(preddict[temp_uuid], dict)  :
+					pred.append(np.asarray([float(preddict[temp_uuid]['value1']), float(preddict[temp_uuid]['value2']),
+					                       float(preddict[temp_uuid]['value3'])],dtype=np.float64))
 				elif isinstance(preddict[temp_uuid], predict_point):
-					pred.append(np.asarray([preddict[temp_uuid].value1, preddict[temp_uuid].value2,
-					                        preddict[temp_uuid].value3]))
+					pred.append(np.asarray([float(preddict[temp_uuid].value1), float(preddict[temp_uuid].value2),
+					                                                                float(preddict[temp_uuid].value3)],dtype=np.float64))
 			else:
-				pred.append(np.asarray([0.1,0.1,0.1]))
+				pred.append(np.asarray([00,0.0,0.0]))
 				missing += 1
 	return 	np.array(pred),np.array(answer),missing
 
@@ -103,13 +108,15 @@ def scoring(predictions_list,answer_list):
 	:return:
 	"""
 	pred,answer,missing=generate_scoring_array(predictions_list,answer_list)
-	print(pred)
-	print(answer)
+	# print(pred)
+	# print(answer)
 	margin1=expect_margin(pred,answer) #选手预测的三日预期收益
 	margin2= expect_margin(answer, answer) #完美预测的三日预期收益
+	price_hit = price_trend_hit(pred, answer)  # 选手预测的三日预期收益
+	
 	margin_rate=np.divide(margin1,margin2)
 	score=np.sum(margin_rate)
-	return score ,missing
+	return score ,margin_rate, price_hit,missing
 
 
 
@@ -138,7 +145,7 @@ def validate_submit(file_path,news_submit=None):
 					submit=[]
 					lines=file1.readlines()
 					keys=lines[0].replace('\r','').replace('\n','').split(sep)
-					for i in range(1,len(lines)):
+					for i in range(1,len(lines)-1):
 						dictitem={}
 						values=lines[i].replace('\r','').replace('\n','').split(sep)
 						for m in range(len(keys)):
@@ -211,30 +218,32 @@ def submitfile2listofdict(file_path):
 		try:
 			submit = []
 			if os.path.splitext(os.path.basename(file_path))[1].lower() == ".json":
-				with codecs.open(file_path, 'r', 'utf-8') as file1:
+				with codecs.open(file_path, 'r', 'utf-8-sig') as file1:
 					dict_str = file1.readlines()
-					submit = json.loads(dict_str[0], encoding='utf-8')
+					jsonstr=''.join(dict_str).replace('\t','')
+					submit = json.loads(jsonstr)
 					return submit
 			elif os.path.splitext(os.path.basename(file_path))[1].lower() == ".pkl":
 				with open(file_path, 'rb') as handle:
 					submit = pickle.load(handle)
 					return submit
-			elif os.path.splitext(os.path.basename(file_path))[1].lower() in [".txt", ".csv", ".dat"]:
-				with codecs.open(file_path, 'r', 'utf-8') as file1:
-					sep = '\t' if os.path.splitext(os.path.basename(file_path))[1].lower() != ".csv" else ','
+			elif os.path.splitext(os.path.basename(file_path))[1].lower() in [".txt", ".csv","tsv", ".dat"]:
+				with codecs.open(file_path, 'r') as file1:
+					sep = '\t'
 					submit = []
 					lines = file1.readlines()
-					keys = lines[0].replace('\r', '').replace('\n', '').split(sep)
-					for i in range(1, len(lines)):
-						dictitem = {}
-						values = lines[i].replace('\r', '').replace('\n', '').split(sep)
-						for m in range(len(keys)):
-							if len(values[0]) > 0:
-								if re.match("^[+-]?\d(>?\.\d+)?$", values[m].strip()):
-									dictitem[keys[m]] = float(values[m].strip())
-								else:
-									dictitem[keys[m]] = values[m].strip()
-						submit.append(dictitem)
+					if len(lines)>0:
+						keys = lines[0].replace('\r', '').replace('\n', '').replace(',', '\t').replace('锘縱alue','value').replace('锘縰uid','uuid').split(sep)
+						for i in range(1, len(lines)):
+							dictitem = {}
+							values = lines[i].replace('\r', '').replace('\n', '').replace(',', '\t').split(sep)
+							for m in range(len(keys)):
+								if len(values[0]) > 0 and m<len(values):
+									if re.match("^[+-]?\d(>?\.\d+)?$", values[m].strip()):
+										dictitem[keys[m]] = float(values[m].strip())
+									else:
+										dictitem[keys[m]] = values[m].strip()
+							submit.append(dictitem)
 					return submit
 		except OSError as e:
 			return None
@@ -243,7 +252,6 @@ def submitfile2listofdict(file_path):
 
 if __name__ == '__main__':
 	
-	result=validate_submit('submit_dataset.txt')
 	predictions_list=[]
 	answer_list=[]
 	
