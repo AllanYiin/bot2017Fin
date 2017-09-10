@@ -3,9 +3,10 @@ from __future__ import print_function
 
 import os
 import re
-
 import cv2
-
+import matplotlib.pyplot as plt
+# import the necessary packages
+from sklearn.cluster import KMeans
 from  round2.images_process.arrary_utils import *
 
 # 目前圖片上的主要顏色，依照RGB排列(請注意，OPENCV是BGR)
@@ -115,8 +116,35 @@ def equal_color(img: Image, color):
         return output_img
 
 
+
+def color_differenciate(img:Image,k:int):
+    imgarr = img2array(img)
+    imgarr_r = imgarr.reshape((imgarr.shape[0] * imgarr.shape[1], 3))
+    clt =KMeans(n_clusters = k)
+    clt.fit(imgarr_r)
+    numLabels = np.arange(0, len(np.unique(clt.labels_)) + 1)
+    images=[]
+    for i in range(len(numLabels)):
+        images.append(np.ones(imgarr_r.shape,dtype=np.int32)*255)
+    for idx in range(len(clt.labels_)):
+            label=clt.labels_[idx]
+            images[label][idx][0]=imgarr_r[idx][0]
+            images[label][idx][1] = imgarr_r[idx][1]
+            images[label][idx][2] = imgarr_r[idx][2]
+    new_images=[]
+    for i in range(len(numLabels)):
+        new_img=array2img(images[i].reshape(imgarr.shape))
+        new_img.save('test_'+str(i)+'.jpg')
+        new_images.append(new_img)
+    return new_images
+
+
+
 if __name__ == '__main__':
     img = Image.open('0cfd7265e70e45e38d96ae888d27fd9b.jpg')
+
+    seperate_images=color_differenciate(img,14)
+
     bimg = equal_color(img, kdj_kColor)
 
     bimg.save('kdj_kColor_0cfd7265e70e45e38d96ae888d27fd9b.jpg')
